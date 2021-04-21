@@ -1,5 +1,13 @@
 import 'dart:math';
+import 'dart:convert';
+import 'package:flutter/widgets.dart';
 
+import '../../network/recipe_model.dart';
+import 'package:flutter/services.dart';
+import '../recipe_card.dart';
+import 'recipe_details.dart';
+
+import 'package:recipe_finder/network/recipe_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/custom_dropdown.dart';
@@ -13,12 +21,13 @@ class RecipeList extends StatefulWidget {
 
 class _RecipeListState extends State<RecipeList> {
   static const String prefSearchKey = 'previousSearches';
+
   bool inErrorState = false;
-  List<String> previousSearches = List<String>();
+  List<String> previousSearches = <String>[];
 
   TextEditingController searchTextController;
-  final _scrollController = ScrollController();
-  List currentSearchList = [];
+  final ScrollController _scrollController = ScrollController();
+  List<APIHits> currentSearchList = [];
   int currentCount = 0;
   int currentStartPosition = 0;
   int currentEndPosition = 20;
@@ -29,6 +38,8 @@ class _RecipeListState extends State<RecipeList> {
   @override
   void initState() {
     super.initState();
+    getPreviousSearches();
+
     searchTextController = TextEditingController(text: '');
     _scrollController
       ..addListener(() {
@@ -51,6 +62,12 @@ class _RecipeListState extends State<RecipeList> {
       });
   }
 
+  Future<APIRecipeQuery> getRecipeData(String query, int from, int to) async {
+    final recipeJson = await RecipeService().getRecipes(query, from, to);
+    final recipeMap = json.decode(recipeJson);
+    return APIRecipeQuery.fromJson(recipeMap);
+  }
+
   @override
   void dispose() {
     searchTextController.dispose();
@@ -67,7 +84,7 @@ class _RecipeListState extends State<RecipeList> {
     if (prefs.containsKey(prefSearchKey)) {
       previousSearches = prefs.getStringList(prefSearchKey);
       if (previousSearches == null) {
-        previousSearches = List<String>();
+        previousSearches = <String>[];
       }
     }
   }
@@ -175,8 +192,63 @@ class _RecipeListState extends State<RecipeList> {
       return Container();
     }
     // Show a loading indicator while waiting for the movies
-    return const Center(
-      child: CircularProgressIndicator(),
+    return FutureBuilder<APIRecipeQuery>(
+      future: getRecipeData(searchTextController.text.trim(),
+          currentStartPosition, currentEndPosition),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(snapshot.error.toString(),
+                  textAlign: TextAlign.center, textScaleFactor: 1.3),
+            );
+          }
+          loading = false;
+          final query = snapshot.data;
+          inErrorState = false;
+          currentCount = query.count;
+          hasMore = query.more;
+          currentSearchList.addAll(query.hits);
+
+          if (query.to < currentEndPosition) {
+            currentEndPosition = query.to;
+          }
+          return _buildRecipeList(context, currentSearchList);
+        } else {
+          if (currentCount == 0) {
+            return const Center(child: CircularProgressIndicator());
+          } else {
+            return _buildRecipeList(context, currentSearchList);
+          }
+        }
+      },
+    );
+  }
+
+  Widget _buildRecipeList(BuildContext recipeListContext, List<APIHits> hits) {
+    final size = MediaQuery.of(context).size;
+    const itemHeight = 310;
+    final itemWidth = size.width / 2;
+    return Flexible(
+      child: GridView.builder(
+        controller: _scrollController,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: (itemWidth / itemHeight),
+        ),
+        itemCount: hits.length,
+        itemBuilder: (BuildContext context, int index) {
+          return _buildRecipeCard(recipeListContext, hits, index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildRecipeCard(BuildContext topLevelContext, List hits, int index) {
+    final recipe = hits[index].recipe;
+    return GestureDetector(
+      onTap: () {},
+      child: recipeCard(recipe),
     );
   }
 }

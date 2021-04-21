@@ -2,13 +2,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
 
 import 'myrecipes/my_recipes_list.dart';
 import 'recipes/recipe_list.dart';
 import 'shopping/shooping_list.dart';
-import 'package:flutter/material.dart';
 
-// ignore: use_key_in_widget_constructors
 class MainScreen extends StatefulWidget {
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -16,7 +15,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  List<Widget> pageList = List<Widget>();
+  List<Widget> pageList = <Widget>[];
   static const String prefSelectedIndexKey = 'selectedIndex';
 
   @override
